@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>あだ名決め</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👍</text></svg>">
+<style>
+  :root { --gold:#ffd23f; --pink:#ff3d81; --blue:#3da5ff; --violet:#7c3aed; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: #fff; min-height: 100vh; overflow-x: hidden;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", Meiryo, sans-serif;
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+    background: linear-gradient(135deg, #12002b, #2a0845, #0b1b4d, #3b0a45);
+    background-size: 400% 400%; animation: bg 14s ease infinite;
+    padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+  }
+  @keyframes bg { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  .wrap { position: relative; z-index: 2; max-width: 640px; margin: 0 auto; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px; min-height: 100vh; }
+  h1 { font-size: 18px; margin: 0; text-align: center; letter-spacing: .3em; color: var(--gold); text-shadow: 0 0 12px rgba(255,210,63,.7); }
+  .sound { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px; z-index: 30; background: rgba(255,255,255,.12); border: 0; color: #fff; border-radius: 999px; width: 40px; height: 40px; font-size: 18px; cursor: pointer; }
+
+  /* 管理者の合計表示 */
+  .meter { text-align: center; padding: 28px 8px 20px; border-radius: 28px; background: rgba(0,0,0,.35); border: 2px solid rgba(255,210,63,.5); box-shadow: 0 0 40px rgba(255,210,63,.25) inset, 0 0 30px rgba(124,58,237,.5); }
+  .meter .label { font-size: 15px; letter-spacing: .3em; color: #ffe9a3; }
+  .total { font-size: clamp(96px, 30vw, 240px); font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 20px #fff, 0 0 40px var(--gold), 0 0 80px var(--gold); transition: color .2s; }
+  .total.pos { color: var(--gold); text-shadow: 0 0 20px #fff2, 0 0 40px #ffb300, 0 0 90px #ff7a00; }
+  .total.neg { color: #8fd0ff; text-shadow: 0 0 20px #fff2, 0 0 40px #3da5ff, 0 0 90px #1b6bff; }
+  .total.bump { animation: bump .18s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .breakdown { display: flex; justify-content: center; gap: 32px; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .breakdown .g { color: var(--gold); } .breakdown .b { color: #8fd0ff; }
+
+  /* 投票ボタン */
+  .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .vote {
+    position: relative; overflow: hidden; appearance: none; border: 3px solid rgba(255,255,255,.75); border-radius: 28px; color: #fff; font: inherit; font-weight: 900;
+    font-size: 28px; padding: 44px 8px; cursor: pointer; touch-action: manipulation;
+    transition: transform .05s, filter .05s; letter-spacing: .06em;
+    text-shadow: 0 2px 0 rgba(0,0,0,.35);
+  }
+  .vote .emoji { display: block; font-size: 60px; margin-bottom: 8px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.4)); }
+  .vote.good { background: linear-gradient(180deg, #ffe45c 0%, #ff9d00 55%, #ff3d81 100%); box-shadow: 0 8px 0 #a3004c, 0 0 30px rgba(255,157,0,.7); animation: glowg 1.6s ease-in-out infinite; }
+  .vote.bad  { background: linear-gradient(180deg, #7fd0ff 0%, #3d6dff 55%, #5b21b6 100%); box-shadow: 0 8px 0 #1a1275, 0 0 30px rgba(61,109,255,.7); animation: glowb 1.6s ease-in-out infinite; }
+  @keyframes glowg { 50% { filter: brightness(1.15); } }
+  @keyframes glowb { 50% { filter: brightness(1.15); } }
+  .vote::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.45) 50%, transparent 65%); transform: translateX(-120%); animation: shine 2.8s linear infinite; pointer-events: none; }
+  @keyframes shine { 60%, 100% { transform: translateX(120%); } }
+  .vote:active, .vote.pressed { transform: translateY(6px) scale(.97); filter: brightness(1.3); }
+  .mine { text-align: center; font-size: 13px; color: #cbb8ff; margin-top: 12px; }
+
+  /* コンボ */
+  .combo { text-align: center; min-height: 64px; font-weight: 900; line-height: 1; }
+  .combo .n { font-size: 52px; font-variant-numeric: tabular-nums; }
+  .combo .t { font-size: 14px; letter-spacing: .3em; opacity: .9; }
+  .combo.up .n { color: var(--gold); text-shadow: 0 0 14px #ff9d00; }
+  .combo.down .n { color: #8fd0ff; text-shadow: 0 0 14px #3d6dff; }
+  .combo.off { opacity: 0; }
+
+  .status { text-align: center; font-size: 12px; color: #cbb8ff; min-height: 16px; }
+  .status.warn { color: #ff8fa3; }
+  .footer { display: flex; justify-content: flex-end; margin-top: auto; }
+  .link { background: none; border: 0; color: rgba(255,255,255,.35); font: inherit; font-size: 12px; cursor: pointer; padding: 6px 4px; text-decoration: underline; }
+  .admin { background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.2); border-radius: 16px; padding: 14px; display: none; flex-direction: column; gap: 10px; }
+  .admin.open { display: flex; }
+  .admin h2 { margin: 0; font-size: 14px; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; user-select: text; -webkit-user-select: text; }
+  .btn { appearance: none; border: 0; border-radius: 10px; background: var(--violet); color: #fff; font: inherit; font-weight: 700; padding: 10px 16px; cursor: pointer; }
+  .btn.reset { background: #fff; color: #2a0845; font-size: 18px; padding: 16px; width: 100%; font-weight: 900; }
+  .msg { font-size: 12px; color: #cbb8ff; min-height: 16px; }
+  .msg.err { color: #ff8fa3; }
+  .hidden { display: none !important; }
+
+  /* エフェクト層 */
+  #fx { position: fixed; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; }
+  .flash { position: fixed; inset: 0; z-index: 19; pointer-events: none; opacity: 0; }
+  .banner { position: fixed; left: 0; right: 0; top: 30%; z-index: 25; text-align: center; font-weight: 900; font-size: clamp(44px, 14vw, 120px); pointer-events: none; opacity: 0; letter-spacing: .05em;
+            background: linear-gradient(180deg, #fff 0%, #ffe45c 40%, #ff3d81 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.8); filter: drop-shadow(0 0 18px rgba(255,157,0,.9)); }
+  .banner.blue { background: linear-gradient(180deg, #fff 0%, #8fd0ff 45%, #5b21b6 100%); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 0 18px rgba(61,109,255,.9)); }
+  @media (prefers-reduced-motion: reduce) { body { animation: none; } .vote, .vote::after { animation: none; } }
+</style>
+</head>
+<body>
+<button id="soundBtn" class="sound" type="button" aria-label="音の切り替え">🔊</button>
+<div id="flash" class="flash"></div>
+<div id="banner" class="banner"></div>
+<div id="fx"></div>
+
+<div id="wrap" class="wrap">
+  <h1>あだ名決め</h1>
+
+  <div id="meter" class="meter hidden">
+    <div class="label">みんなの合計</div>
+    <div id="total" class="total">0</div>
+    <div class="breakdown"><span class="g">👍 <span id="sumUp">0</span></span><span class="b">👎 <span id="sumDown">0</span></span></div>
+  </div>
+
+  <div id="voter">
+    <div id="combo" class="combo off"><div class="n" id="comboN">0</div><div class="t" id="comboT">COMBO</div></div>
+    <div class="buttons">
+      <button id="btnUp" class="vote good" type="button"><span class="emoji">👍</span>いいね</button>
+      <button id="btnDown" class="vote bad" type="button"><span class="emoji">👎</span>微妙</button>
+    </div>
+    <div class="mine">あなたの投票：<span id="mineUp">0</span> いいね ／ <span id="mineDown">0</span> 微妙</div>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div id="adminBox" class="admin">
+    <h2>管理者</h2>
+    <div id="loginBox" class="row">
+      <input id="pw" type="password" placeholder="パスワード" autocomplete="off">
+      <button id="loginBtn" class="btn" type="button">入る</button>
+    </div>
+    <div id="resetBox" class="hidden">
+      <button id="resetBtn" class="btn reset" type="button">🔄 リセット（次のあだ名へ）</button>
+    </div>
+    <div id="adminMsg" class="msg"></div>
+  </div>
+
+  <div class="footer"><button id="adminToggle" class="link" type="button">管理者</button></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ▼▼▼ ここにFirebaseの設定値を貼る ▼▼▼
+var firebaseConfig = {
+  apiKey: "AIzaSyC157mVBIhuwkyEPPnYw2BDUyvMZOoMZCs",
+  authDomain: "nickname-vote.firebaseapp.com",
+  databaseURL: "https://nickname-vote-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "nickname-vote",
+  storageBucket: "nickname-vote.firebasestorage.app",
+  messagingSenderId: "275987273813",
+  appId: "1:275987273813:web:bb102ca71009271fe3dcdc"
+};
+// ▲▲▲ ここまで ▲▲▲
+
+var ADMIN_PASSWORD = "KEIZO1011";
+var MAX = 100000;
+var FLUSH_MS = 150;
+
+var $ = function (id) { return document.getElementById(id); };
+function setStatus(t, warn) { var e = $("status"); e.textContent = t; e.className = "status" + (warn ? " warn" : ""); }
+function num(v) { v = Number(v); if (!isFinite(v)) return 0; return Math.max(0, Math.min(MAX, Math.floor(v))); }
+
+var db = null, votesRef = null, roundRef = null, myRef = null;
+var myUp = 0, myDown = 0, myRound = 0, curRound = 0;
+var isAdmin = false, flushTimer = null, lastTotal = null, allVotes = {};
+
+function clientId() {
+  var id = null;
+  try { id = localStorage.getItem("nick_cid"); } catch (e) {}
+  if (!id) {
+    id = "c" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    try { localStorage.setItem("nick_cid", id); } catch (e) {}
+  }
+  return id;
+}
+var CID = clientId();
+
+// ===== 演出 =====
+var REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+var soundOn = true, actx = null;
+var fxLayer = $("fx");
+
+function ensureAudio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+  if (actx && actx.state === "suspended") actx.resume();
+}
+function tone(freq, dur, type, vol, slideTo) {
+  if (!soundOn || !actx) return;
+  var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+var PENT = [0, 2, 4, 7, 9];
+function soundUp(c) {
+  var semi = PENT[c % 5] + 12 * Math.min(2, Math.floor(c / 5));
+  tone(523.25 * Math.pow(2, semi / 12), 0.14, "triangle", 0.18);
+}
+function soundDown() { tone(220, 0.16, "square", 0.12, 110); }
+function soundBig() { [0, 4, 7, 12, 16].forEach(function (n, i) { setTimeout(function () { tone(523.25 * Math.pow(2, n / 12), 0.25, "triangle", 0.2); }, i * 70); }); }
+$("soundBtn").addEventListener("click", function () { soundOn = !soundOn; this.textContent = soundOn ? "🔊" : "🔇"; ensureAudio(); });
+
+function spawn(emoji, x, y, opts) {
+  if (REDUCED) return;
+  if (fxLayer.childNodes.length > 60) return;
+  opts = opts || {};
+  var el = document.createElement("div");
+  el.textContent = emoji;
+  el.style.cssText = "position:absolute;left:" + x + "px;top:" + y + "px;font-size:" + (opts.size || 34) + "px;will-change:transform,opacity;";
+  fxLayer.appendChild(el);
+  var dx = (Math.random() - 0.5) * (opts.spread || 220);
+  var dy = -(opts.rise || (140 + Math.random() * 180));
+  var rot = (Math.random() - 0.5) * 120;
+  var a = el.animate([
+    { transform: "translate(-50%,-50%) scale(.6) rotate(0deg)", opacity: 1 },
+    { transform: "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px)) scale(1.3) rotate(" + rot + "deg)", opacity: 0 }
+  ], { duration: opts.dur || 800, easing: "cubic-bezier(.2,.7,.3,1)" });
+  a.onfinish = function () { el.remove(); };
+}
+function flash(color, strength) {
+  if (REDUCED) return;
+  var f = $("flash");
+  f.style.background = "radial-gradient(circle at 50% 50%, " + color + " 0%, transparent 70%)";
+  f.animate([{ opacity: strength || 0.8 }, { opacity: 0 }], { duration: 450, easing: "ease-out" });
+}
+function shake(px) {
+  if (REDUCED) return;
+  $("wrap").animate([
+    { transform: "translate(0,0)" }, { transform: "translate(" + (-px) + "px," + px + "px)" },
+    { transform: "translate(" + px + "px," + (-px) + "px)" }, { transform: "translate(" + (-px / 2) + "px,0)" }, { transform: "translate(0,0)" }
+  ], { duration: 280 });
+}
+function banner(text, blue) {
+  var b = $("banner");
+  b.textContent = text; b.className = "banner" + (blue ? " blue" : "");
+  if (REDUCED) { b.style.opacity = 1; setTimeout(function () { b.style.opacity = 0; }, 700); return; }
+  b.animate([
+    { opacity: 0, transform: "scale(.4) rotate(-6deg)" },
+    { opacity: 1, transform: "scale(1.15) rotate(2deg)", offset: 0.25 },
+    { opacity: 1, transform: "scale(1) rotate(0deg)", offset: 0.7 },
+    { opacity: 0, transform: "scale(1.3)" }
+  ], { duration: 1100, easing: "ease-out" });
+}
+function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+// コンボ
+var combo = 0, comboKind = null, comboTimer = null;
+var TIERS = [[100, "大当たり!!"], [50, "SUPER!!!"], [25, "GREAT!!"], [10, "NICE!"]];
+function tierAt(c) {
+  if (c >= 100 && c % 100 === 0) return "大当たり!!";
+  for (var i = 1; i < TIERS.length; i++) if (c === TIERS[i][0]) return TIERS[i][1];
+  return null;
+}
+function comboHit(kind) {
+  if (comboKind !== kind) { combo = 0; comboKind = kind; }
+  combo++;
+  var box = $("combo");
+  box.className = "combo " + kind;
+  $("comboN").textContent = String(combo);
+  $("comboT").textContent = kind === "up" ? "COMBO" : "COMBO";
+  if (!REDUCED) $("comboN").animate([{ transform: "scale(1.35)" }, { transform: "scale(1)" }], { duration: 120 });
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(function () { combo = 0; comboKind = null; box.className = "combo off"; }, 1300);
+  return combo;
+}
+
+function voteFx(kind, btn, e) {
+  ensureAudio();
+  var c = comboHit(kind);
+  var r = btn.getBoundingClientRect();
+  var x = (e && e.clientX) || (r.left + r.width / 2);
+  var y = (e && e.clientY) || (r.top + r.height / 2);
+  btn.classList.add("pressed"); setTimeout(function () { btn.classList.remove("pressed"); }, 60);
+  if (kind === "up") {
+    soundUp(c);
+    spawn(["👍", "✨", "⭐", "💖"][c % 4], x, y, { size: 30 + Math.min(c, 40) / 2 });
+    if (c % 3 === 0) spawn("👍", x, y, { size: 26 });
+    buzz(8);
+  } else {
+    soundDown();
+    spawn(["👎", "💧", "💤"][c % 3], x, y, { size: 30, rise: 100 + Math.random() * 120 });
+    buzz(6);
+  }
+  var t = tierAt(c);
+  if (t) {
+    banner(t, kind === "down");
+    flash(kind === "up" ? "rgba(255,210,63,.9)" : "rgba(61,165,255,.9)", 0.75);
+    shake(c >= 50 ? 14 : 8);
+    soundBig(); buzz([30, 30, 60]);
+    for (var i = 0; i < 14; i++) spawn(kind === "up" ? ["🎉", "✨", "⭐", "👍"][i % 4] : ["💧", "👎"][i % 2], innerWidth / 2, innerHeight * 0.45, { size: 36, spread: 520, rise: 200 + Math.random() * 260, dur: 1100 });
+  }
+}
+
+
+function renderMine() {
+  $("mineUp").textContent = String(myUp);
+  $("mineDown").textContent = String(myDown);
+}
+
+var shownTotal = 0, targetTotal = 0, rollRAF = null, prevUp = null, prevDown = null;
+function roll() {
+  var diff = targetTotal - shownTotal;
+  if (Math.abs(diff) < 0.5) shownTotal = targetTotal; else shownTotal += diff * 0.3;
+  var el = $("total");
+  el.textContent = String(Math.round(shownTotal));
+  var t = Math.round(shownTotal);
+  el.className = "total" + (t > 0 ? " pos" : t < 0 ? " neg" : "");
+  rollRAF = shownTotal === targetTotal ? null : requestAnimationFrame(roll);
+}
+function adminBurst(dUp, dDown, oldTotal, newTotal) {
+  var w = innerWidth, h = innerHeight, i;
+  var nUp = Math.min(dUp, 14), nDown = Math.min(dDown, 14);
+  for (i = 0; i < nUp; i++) (function (k) { setTimeout(function () { spawn(["👍", "✨", "⭐"][k % 3], w * (0.1 + Math.random() * 0.8), h * 0.95, { size: 40, rise: h * (0.5 + Math.random() * 0.4), spread: 120, dur: 1300 }); }, k * 25); })(i);
+  for (i = 0; i < nDown; i++) (function (k) { setTimeout(function () { spawn(["👎", "💧"][k % 2], w * (0.1 + Math.random() * 0.8), h * 0.95, { size: 40, rise: h * (0.4 + Math.random() * 0.4), spread: 120, dur: 1300 }); }, k * 25); })(i);
+  var el = $("total");
+  if (!REDUCED) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+  if (newTotal > oldTotal && Math.floor(newTotal / 10) > Math.floor(oldTotal / 10) && newTotal > 0) {
+    banner("JACKPOT!!"); flash("rgba(255,210,63,.9)", 0.7); shake(12);
+    for (i = 0; i < 16; i++) spawn(["🎉", "✨", "⭐", "💖"][i % 4], w / 2, h * 0.5, { size: 44, spread: w * 0.9, rise: 200 + Math.random() * 300, dur: 1200 });
+  } else if (newTotal < oldTotal && Math.ceil(newTotal / 10) < Math.ceil(oldTotal / 10) && newTotal < 0) {
+    banner("ドンマイ…", true); flash("rgba(61,165,255,.8)", 0.5);
+  }
+}
+function renderTotal() {
+  var up = 0, down = 0;
+  for (var k in allVotes) {
+    var v = allVotes[k];
+    if (!v || Number(v.round) !== curRound) continue;
+    up += num(v.up); down += num(v.down);
+  }
+  var total = up - down;
+  if (prevUp !== null && (up !== prevUp || down !== prevDown)) {
+    var dUp = Math.max(0, up - prevUp), dDown = Math.max(0, down - prevDown);
+    if (isAdmin) adminBurst(dUp, dDown, lastTotal === null ? 0 : lastTotal, total);
+  }
+  prevUp = up; prevDown = down; lastTotal = total;
+  targetTotal = total;
+  if (!rollRAF) rollRAF = requestAnimationFrame(roll);
+  $("sumUp").textContent = String(up);
+  $("sumDown").textContent = String(down);
+}
+
+function flush() {
+  flushTimer = null;
+  if (!myRef) return;
+  myRef.set({ up: myUp, down: myDown, round: myRound }).catch(function () { setStatus("送信に失敗しました。通信を確認してください。", true); });
+}
+function scheduleFlush() { if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS); }
+
+function vote(kind, btn, e) {
+  if (kind === "up") myUp = Math.min(MAX, myUp + 1); else myDown = Math.min(MAX, myDown + 1);
+  renderMine();
+  scheduleFlush();
+  voteFx(kind, btn, e);
+}
+function bindVote(btn, kind) {
+  var fired = false;
+  btn.addEventListener("pointerdown", function (e) { fired = true; vote(kind, btn, e); });
+  btn.addEventListener("click", function (e) { if (fired) { fired = false; return; } vote(kind, btn, null); });
+}
+bindVote($("btnUp"), "up");
+bindVote($("btnDown"), "down");
+
+// 管理者
+$("adminToggle").addEventListener("click", function () { $("adminBox").classList.toggle("open"); });
+function login() {
+  if ($("pw").value === ADMIN_PASSWORD) {
+    isAdmin = true;
+    $("loginBox").classList.add("hidden");
+    $("resetBox").classList.remove("hidden");
+    $("meter").classList.remove("hidden");
+    $("voter").classList.add("hidden");
+    $("adminToggle").classList.add("hidden");
+    $("adminMsg").className = "msg";
+    $("adminMsg").textContent = "";
+    if (votesRef) votesRef.on("value", function (s) { allVotes = s.val() || {}; renderTotal(); });
+    renderTotal();
+  } else {
+    $("adminMsg").className = "msg err";
+    $("adminMsg").textContent = "パスワードが違います";
+  }
+  $("pw").value = "";
+}
+$("loginBtn").addEventListener("click", login);
+$("pw").addEventListener("keydown", function (e) { if (e.key === "Enter") login(); });
+
+$("resetBtn").addEventListener("click", function () {
+  if (!isAdmin || !db) return;
+  var n = Date.now();
+  votesRef.remove().then(function () { return roundRef.set(n); }).then(function () {
+    $("adminMsg").className = "msg";
+    $("adminMsg").textContent = "リセットしました";
+  }).catch(function () {
+    $("adminMsg").className = "msg err";
+    $("adminMsg").textContent = "リセットに失敗しました";
+  });
+});
+
+// 起動
+(function init() {
+  if (!firebaseConfig.apiKey || !firebaseConfig.databaseURL) {
+    setStatus("Firebaseの設定が未入力です。", true);
+    return;
+  }
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+  } catch (e) {
+    setStatus("Firebaseの初期化に失敗しました。設定値を確認してください。", true);
+    return;
+  }
+  votesRef = db.ref("votes");
+  roundRef = db.ref("round");
+  myRef = db.ref("votes/" + CID);
+
+  db.ref(".info/connected").on("value", function (s) {
+    setStatus(s.val() === true ? "" : "接続中…", s.val() !== true);
+  });
+
+  // ラウンド(リセット)の監視
+  roundRef.on("value", function (s) {
+    var r = Number(s.val()) || 0;
+    if (r !== curRound) {
+      curRound = r;
+      if (r !== myRound) { myRound = r; myUp = 0; myDown = 0; renderMine(); }
+      renderTotal();
+    }
+  });
+
+  // 再読み込み時に自分の票を復元（現在のラウンドの分だけ）
+  roundRef.get().then(function (rs) {
+    var r = Number(rs.val()) || 0;
+    return myRef.get().then(function (s) {
+      var v = s.val();
+      if (v && Number(v.round) === r && myUp === 0 && myDown === 0) {
+        myUp = num(v.up); myDown = num(v.down); myRound = r; curRound = r; renderMine();
+      }
+    });
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>
